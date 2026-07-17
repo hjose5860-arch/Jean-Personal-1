@@ -813,6 +813,8 @@ const CONFIG = {
   TRAINER_NAME: "Jean Souza",
   TRAINER_WHATSAPP: "5511987484430",
   INSTAGRAM_URL: "https://www.instagram.com/jeanpersonal__/",
+  // Cole aqui a URL do Apps Script depois de publicar (veja instruções em separado). Deixe "" pra desativar.
+  SHEET_WEBHOOK_URL: "https://script.google.com/macros/s/AKfycbyipMhCnJcZ0M8IslY977ucrFFBeafE8t3KMU9tJelLMNdKyotmiV6HCN1hSiKH-6N3/exec",
 };
 // ================================================
 
@@ -1044,6 +1046,25 @@ function escapeHtml(str){
   return String(str).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
+// ---------- envia respostas pra planilha (painel do Jean) ----------
+function sendToSheet(dataObj){
+  if(!CONFIG.SHEET_WEBHOOK_URL) return;
+  try{
+    const values = [
+      new Date().toLocaleString('pt-BR'),
+      ...FIELD_ORDER.map(key => dataObj[key] || '')
+    ];
+    fetch(CONFIG.SHEET_WEBHOOK_URL, {
+      method: 'POST',
+      mode: 'no-cors',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ values })
+    }).catch(err => console.warn('Falha ao enviar pra planilha:', err));
+  }catch(err){
+    console.warn('Falha ao montar dados pra planilha:', err);
+  }
+}
+
 // ---------- geração do PDF ----------
 function buildPDF(dataObj){
   const { jsPDF } = window.jspdf;
@@ -1125,13 +1146,8 @@ async function submitAnamnese(){
   const dataObj = Object.fromEntries(fd.entries());
   dataObj.enviadoEm = new Date().toISOString();
 
-  // salva as respostas em texto (sem fotos) — base pronta pra futuro painel administrativo
-  try{
-    const key = `anamnese:${Date.now()}`;
-    await window.storage.set(key, JSON.stringify(dataObj), true);
-  }catch(err){
-    console.error('Falha ao salvar anamnese:', err);
-  }
+  // envia as respostas em texto (sem fotos) pra planilha — vira o painel do Jean
+  sendToSheet(dataObj);
 
   btnNext.disabled = true;
   btnNext.textContent = 'Gerando PDF...';
